@@ -64,7 +64,7 @@ module.exports = {
       var fileCount = getSafe(() => ConfigFile.deviceKind[0].files.length, 0);
       var triggerCount = getSafe(() => ConfigFile.deviceKind[0].Trigger.length, 0);
 
-      Config = { files: [], trigger: [] };
+      Config = { files: [], trigger: [], mainfunction: null };
       for (var i = 0; i < fileCount; i++) {
         let newFile = {
           id: getSafe(() => ConfigFile.deviceKind[0].files[i].id, null),
@@ -76,6 +76,7 @@ module.exports = {
       for (var i = 0; i < triggerCount; i++) {
         Config.trigger.push(getSafe(() => ConfigFile.deviceKind[0].Trigger[i], null));
       }
+      Config.mainfunction = getSafe(() => ConfigFile.deviceKind[0].mainFunction, null);
 
       console.log("Parsed: Files: " + fileCount + " Trigger: " + triggerCount);
       //console.log(util.inspect(Config, { showHidden: false, depth: null }));

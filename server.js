@@ -4,10 +4,12 @@ var psTree = require("ps-tree");
 const Gpio = require("onoff").Gpio;
 const { exec } = require("child_process");
 var fs = require("fs");
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 const Parser = require("./parser.js");
 
 const Buttons = [];
+var MainLoopTimer;
 var State = {};
 var BlockButton = false;
 var PlayerTask = null;
@@ -63,7 +65,7 @@ function OmxKill() {
   });
 }
 
-function OmxPlayFile(file, volume = Volume) {
+async function OmxPlayFile(file, volume = Volume) {
   return new Promise(function (resolve, reject) {
     if (!BlockButton) {
       buttonBlock();
@@ -80,7 +82,7 @@ function OmxPlayFile(file, volume = Volume) {
           PlayerTask = null;
         }*/
         });
-        return true;
+        //return true;
       });
     }
   });
@@ -96,6 +98,37 @@ async function OmxPlayFileLoop(file, volume = Volume) {
   }
 }
 
+function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
+  console.log("Start Main Function");
+  //if (mainFunction != null) {
+  var customFunction = new Function(mainFunction);
+  //customFunction = new AsyncFunction(customFunction);
+  var Config = new Parser.getConfig();
+  var getFileById = Parser.getFileById;
+  var RestartMain = MainFunction;
+  clearInterval(MainLoopTimer);
+  MainLoopTimer = setInterval(function () {
+    try {
+      customFunction.call({
+        OmxPlayFile,
+        OmxPlayFileLoop,
+        getFileById,
+        RestartMain,
+        OmxKill,
+        Config,
+        State,
+      });
+      //setTimeout(MainFunction(mainFunction), 5000);
+    } catch (e) {
+      console.log("Import Code Error");
+      console.log(e);
+    }
+  }, 5000);
+  /*} else {
+    console.log("No Main Function");
+  }*/
+}
+
 //ToDo: protect members (without status)
 //Input: Trigger Object from Config Array
 async function attachButton(Trigger /*number, file, isrepeat = false, isdefault = false*/) {
@@ -103,7 +136,9 @@ async function attachButton(Trigger /*number, file, isrepeat = false, isdefault 
   Buttons[Trigger.gpio].watch((err, value) => {
     console.log("Button Trigger GPIO: " + Trigger.gpio);
     if (Trigger.customFunction != null) {
+      clearInterval(MainLoopTimer);
       var customFunction = new Function(Trigger.customFunction);
+      var RestartMain = MainFunction;
       var Config = new Parser.getConfig();
       var getFileById = Parser.getFileById;
       try {
@@ -112,6 +147,7 @@ async function attachButton(Trigger /*number, file, isrepeat = false, isdefault 
           OmxPlayFileLoop,
           getFileById,
           OmxKill,
+          RestartMain,
           Config,
           Trigger,
           State,
@@ -129,13 +165,16 @@ async function attachButton(Trigger /*number, file, isrepeat = false, isdefault 
 Parser.init({ configpath: "./media/", configfile: "config_files.json" }).then(function () {
   fs.watchFile(Parser.getConfigPath(), (curr, prev) => {
     console.log("Restart from File Change: " + Parser.getConfigPath());
-    process.kill(process.pid, "SIGUSR2");
-    process.exit();
+    OmxKill().then(function (result) {
+      process.kill(process.pid, "SIGUSR2");
+      process.exit();
+    });
   });
   Volume = Parser.checkENV("VOLUME", 500);
   Parser.parseConfig().then(function (Config) {
     //console.log("By ID XX " + Parser.getFileById(23));
-
+    //OmxPlayFile(Parser.getFileById(23), -2009).then(console.log("test1111"));
+    MainFunction();
     for (var i = 0; i < Config.trigger.length; i++) {
       if (Config.trigger[i].gpio != undefined) {
         console.log("----------NEW BUTTON GPIO: " + Config.trigger[i].gpio + "--------");
