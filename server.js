@@ -85,7 +85,7 @@ async function OmxPlayFile(file, volume = Volume) {
 }
 
 async function OmxPlayFileLoop(file, volume = Volume) {
-  for (var i = 0; i <= 3; i++) {
+  while (true) {
     await OmxPlayFile(file, volume);
     if (BlockButton) {
       console.log("Button breaks loop");
