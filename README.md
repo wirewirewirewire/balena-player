@@ -16,6 +16,18 @@ To give your device a public URL, access the device page on the [balenaCloud das
 [balena-cli]: https://www.balena.io/docs/reference/cli/
 [balena-dashboard]: https://dashboard.balena-cloud.com/
 
+Docker Composer:
+balena-player:
+build: ./balena-player
+volumes: - "11dev:/usr/src/app" - "workdir:/usr/src/app/media"
+privileged: true
+labels:
+io.resin.features.dbus: "1"
+io.resin.features.kernel-modules: "1"
+io.resin.features.firmware: "1"
+
+Example:
+
 if(currentLanguage === "de") {
 changeLanguage("en");
 const file = playersettings.basepath() + \_config[button_order_select].file;
