@@ -145,7 +145,7 @@ function attachButton(Trigger /*number, file, isrepeat = false, isdefault = fals
     console.log("Button Trigger GPIO: " + Trigger.gpio);
     if (Trigger.customFunction != null) {
       clearInterval(MainLoopTimer);
-      var customFunction = new Function(Trigger.customFunction);
+      var customFunction = new AsyncFunction(Trigger.customFunction);
       var RestartMain = MainFunction;
       var Config = new Parser.getConfig();
       var getFileById = Parser.getFileById;
