@@ -99,7 +99,16 @@ module.exports = {
   //Get File URL from Strapi Field ID
   getFileById: function (id) {
     for (var i = 0; i < getSafe(() => Config.files).length; i++) {
-      if (getSafe(() => Config.files[i].id === id)) return CONFIGPATH.substring(0, CONFIGPATH.length - 1) + getSafe(() => Config.files[i].file);
+      if (getSafe(() => Config.files[i].id) === id) return CONFIGPATH.substring(0, CONFIGPATH.length - 1) + getSafe(() => Config.files[i].file);
+    }
+    return null;
+  },
+  getIdByFile: function (file) {
+    var file = file.replace(CONFIGPATH, "/");
+    for (var i = 0; i < getSafe(() => Config.files).length; i++) {
+      console.log(file);
+      console.log(Config.files[i].file);
+      if (getSafe(() => Config.files[i].file) === file) return getSafe(() => Config.files[i].id);
     }
     return null;
   },

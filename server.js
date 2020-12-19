@@ -72,9 +72,12 @@ async function OmxPlayFile(file, volume = Volume) {
     if (!BlockButton) {
       OmxKill().then((result) => {
         console.log("Play Video: " + file);
+        State.file = file;
+        State.isPlaying = true;
         PlayerTask = exec("omxplayer -o local --vol " + volume + " " + file);
         PlayerTask.on("exit", (code) => {
           console.log("child process exited with code " + code);
+          State.isPlaying = false;
           resolve(true);
           //console.log(util.inspect(PlayerTask, { showHidden: false, depth: null }));
         });
@@ -88,7 +91,7 @@ async function OmxPlayFileLoop(file, volume = Volume) {
   while (true) {
     await OmxPlayFile(file, volume);
     if (BlockButton) {
-      console.log("Button breaks loop");
+      console.log("EXIT OMX LOOP");
       break;
     }
   }
@@ -105,20 +108,22 @@ function StartMain() {
 
 function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
   if (StopMainFunction) return;
-  console.log("---Start Main Function---");
+  console.log("START MAIN");
   //if (mainFunction != null) {
   var customFunction = new AsyncFunction(mainFunction);
   //customFunction = new AsyncFunction(customFunction);
   var Config = new Parser.getConfig();
   var getFileById = Parser.getFileById;
+  var getIdByFile = Parser.getIdByFile;
   var RestartMain = MainFunction;
-  clearInterval(MainLoopTimer);
+  //clearInterval(MainLoopTimer);
   //MainLoopTimer = setInterval(function () {
   try {
     customFunction.call({
       OmxPlayFile,
       OmxPlayFileLoop,
       getFileById,
+      getIdByFile,
       RestartMain,
       StartMain,
       StopMain,
@@ -128,7 +133,7 @@ function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
     });
     //setTimeout(MainFunction(mainFunction), 5000);
   } catch (e) {
-    console.log("Import Code Error");
+    console.log("Import Code Error ");
     console.log(e);
   }
   //}, 5000);
@@ -142,18 +147,21 @@ function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
 function attachButton(Trigger /*number, file, isrepeat = false, isdefault = false*/) {
   Buttons[Trigger.gpio] = new Gpio(Trigger.gpio, "in", "rising", { debounceTimeout: 50 });
   Buttons[Trigger.gpio].watch((err, value) => {
-    console.log("Button Trigger GPIO: " + Trigger.gpio);
+    console.log("-----Button Trigger GPIO: " + Trigger.gpio + "------");
     if (Trigger.customFunction != null) {
       clearInterval(MainLoopTimer);
+      //StopMain();
       var customFunction = new AsyncFunction(Trigger.customFunction);
       var RestartMain = MainFunction;
       var Config = new Parser.getConfig();
       var getFileById = Parser.getFileById;
+      var getIdByFile = Parser.getIdByFile;
       try {
         customFunction.call({
           OmxPlayFile,
           OmxPlayFileLoop,
           getFileById,
+          getIdByFile,
           OmxKill,
           RestartMain,
           StartMain,
