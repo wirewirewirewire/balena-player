@@ -72,6 +72,7 @@ async function OmxPlayFile(file, volume = Volume) {
       OmxKill().then((result) => {
         console.log("Play Video: " + file);
         State.file = file;
+        State.fileId = Parser.getIdByFile(file);
         State.isPlaying = true;
         PlayerTask = exec("omxplayer -o local --vol " + volume + " " + file);
         PlayerTask.on("exit", (code) => {
