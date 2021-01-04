@@ -106,8 +106,8 @@ module.exports = {
   getIdByFile: function (file) {
     var file = file.replace(CONFIGPATH, "/");
     for (var i = 0; i < getSafe(() => Config.files).length; i++) {
-      console.log(file);
-      console.log(Config.files[i].file);
+      //console.log(file);
+      //console.log(Config.files[i].file);
       if (getSafe(() => Config.files[i].file) === file) return getSafe(() => Config.files[i].id);
     }
     return null;

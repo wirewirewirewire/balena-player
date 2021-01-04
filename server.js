@@ -9,7 +9,6 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const Parser = require("./parser.js");
 
 const Buttons = [];
-var MainLoopTimer;
 var State = {};
 var BlockButton = false;
 var StopMainFunction = false;
@@ -77,12 +76,16 @@ async function OmxPlayFile(file, volume = Volume) {
         PlayerTask = exec("omxplayer -o local --vol " + volume + " " + file);
         PlayerTask.on("exit", (code) => {
           console.log("child process exited with code " + code);
-          State.isPlaying = false;
+          if (code == 0) {
+            State.isPlaying = false;
+          }
           resolve(true);
           //console.log(util.inspect(PlayerTask, { showHidden: false, depth: null }));
         });
         //return true;
       });
+    } else {
+      console.log("Button still blocked");
     }
   });
 }
@@ -98,7 +101,10 @@ async function OmxPlayFileLoop(file, volume = Volume) {
 }
 
 function StopMain() {
-  StopMainFunction = true;
+  return new Promise((resolve, reject) => {
+    StopMainFunction = true;
+    resolve(true);
+  });
 }
 
 function StartMain() {
@@ -107,8 +113,8 @@ function StartMain() {
 }
 
 function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
-  if (StopMainFunction) return;
-  console.log("START MAIN");
+  if (StopMainFunction || BlockButton) return;
+  console.log("-----START MAIN----");
   //if (mainFunction != null) {
   var customFunction = new AsyncFunction(mainFunction);
   //customFunction = new AsyncFunction(customFunction);
@@ -116,8 +122,7 @@ function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
   var getFileById = Parser.getFileById;
   var getIdByFile = Parser.getIdByFile;
   var RestartMain = MainFunction;
-  //clearInterval(MainLoopTimer);
-  //MainLoopTimer = setInterval(function () {
+
   try {
     customFunction.call({
       OmxPlayFile,
@@ -136,7 +141,6 @@ function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
     console.log("Import Code Error ");
     console.log(e);
   }
-  //}, 5000);
   /*} else {
     console.log("No Main Function");
   }*/
@@ -149,7 +153,6 @@ function attachButton(Trigger /*number, file, isrepeat = false, isdefault = fals
   Buttons[Trigger.gpio].watch((err, value) => {
     console.log("-----Button Trigger GPIO: " + Trigger.gpio + "------");
     if (Trigger.customFunction != null) {
-      clearInterval(MainLoopTimer);
       //StopMain();
       var customFunction = new AsyncFunction(Trigger.customFunction);
       var RestartMain = MainFunction;
