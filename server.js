@@ -150,7 +150,7 @@ function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
 //ToDo: protect members (without status)
 //Input: Trigger Object from Config Array
 function attachButton(Trigger /*number, file, isrepeat = false, isdefault = false*/) {
-  Buttons[Trigger.gpio] = new Gpio(Trigger.gpio, "in", "rising", { debounceTimeout: 50 });
+  Buttons[Trigger.gpio] = new Gpio(Trigger.gpio, "in", "falling", { debounceTimeout: 50 });
   Buttons[Trigger.gpio].watch((err, value) => {
     console.log("-----Button Trigger GPIO: " + Trigger.gpio + "------");
     if (Trigger.customFunction != null) {
