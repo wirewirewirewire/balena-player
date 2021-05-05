@@ -25,8 +25,15 @@ labels:
 io.resin.features.dbus: "1"
 io.resin.features.kernel-modules: "1"
 io.resin.features.firmware: "1"
+### Automatic loop
 
-Example:
+Replace the ID by the file number in the `Files` repeater.
+```
+await this.OmxPlayFile(this.getFileById(43),600)
+this.RestartMain();
+```
+
+### Example:
 
 if(currentLanguage === "de") {
 changeLanguage("en");
