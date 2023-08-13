@@ -5,20 +5,27 @@ const Gpio = require("onoff").Gpio;
 const { exec, spawn } = require("child_process");
 var fs = require("fs");
 const Parser = require("./parser.js");
+const dgram = require("dgram");
+const socket = dgram.createSocket("udp4");
 
 const env = Object.create(process.env);
 env.DISPLAY = ":0";
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-var DEBUG = false;
+const getVlcTimeCmd = `DISPLAY=:0 dbus-send --print-reply --session --dest=org.mpris.MediaPlayer2.vlc /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Get string:"org.mpris.MediaPlayer2.Player" string:"Position"`;
 
 const Buttons = [];
 var State = {};
+var vlcPlayerTask;
+var PlayerTask = null;
+var udpTimer;
+var RPI = false;
+
+var DEBUG = false;
+var STATION_ID = 0;
+
 var BlockButton = false;
 var StopMainFunction = false;
-var PlayerTask = null;
 var Volume = 500;
-var RPI = false;
-var vlcPlayerTask;
 
 var killall = function (pid, signal, callback) {
   signal = signal || "SIGKILL";
@@ -96,39 +103,125 @@ async function OmxPlayFile(file, volume = Volume) {
   });
 }
 
-async function vlcPlayer(file, loop = false, audio = false, volume = Volume) {
+async function vlcKill() {
+  return new Promise((resolve, reject) => {
+    if (vlcPlayerTask != undefined) {
+      console.log("[VLC] kill VLC player");
+      vlcPlayerTask.kill();
+      vlcPlayerTask = undefined;
+      State.file = "";
+      State.isPlaying = false;
+      clearInterval(udpTimer);
+      resolve(true);
+    } else {
+      console.log("[VLC] no player task");
+      resolve(false);
+    }
+  });
+}
+
+let vlcGetTime = async function () {
+  return new Promise(async (resolve, reject) => {
+    if (DEBUG) console.log("[VLC] get time");
+    exec(getVlcTimeCmd, (error, stdout, stderr) => {
+      if (error) {
+        console.log(`Error: ${error.message}`);
+        resolve(false);
+        return;
+      }
+      if (stderr) {
+        console.log(`stderr: ${stderr}`);
+        resolve(false);
+        return;
+      }
+      if (DEBUG) console.log(`stdout: ${stdout}`);
+      let match = stdout.match(/(\d+)(?![\s\S]*\d)/);
+      let lastNumber = match ? match[0] : null;
+      lastNumber = Math.floor(lastNumber / 1000);
+      resolve(lastNumber);
+    });
+  });
+};
+
+async function vlcPlayer(file, loop = false, volume = Volume, audio = false, fullscreen = true) {
   var fileName = file;
-  playerParams = ["-f", "--no-osd", "--control", "dbus"];
+  try {
+    State.file = path.basename(fileName);
+  } catch (error) {
+    console.log("[VLC] ERR no valid file path");
+    return false;
+  }
+  State.isPlaying = true;
+  playerParams = ["--no-osd", "--play-and-exit", "--control", "dbus"];
   if (loop) {
     playerParams.push("--loop");
   }
   if (!audio) {
     playerParams.push("--no-audio");
   }
+  if (fullscreen) {
+    playerParams.push("-f");
+  }
   playerParams.push(fileName);
 
   return new Promise(async (resolve, reject) => {
-    console.log("Launching player");
-    var playerTask = spawn("cvlc", ["-f", "--no-osd", "--no-audio", "--control", "dbus", fileName], { env: env });
+    console.log("[VLC] start file: " + fileName + " with params: " + playerParams);
 
-    playerTask.stdout.on("data", (data) => {
-      console.error(`stdout: ${data}`);
+    udpTimer = setInterval(async () => {
+      sendPostion(STATION_ID, State.file);
+    }, 1000);
+    var vlcPlayer = spawn("cvlc", playerParams, { env: env });
+
+    vlcPlayer.stdout.on("data", (data) => {
+      console.error(`[VLC] stdout: ${data}`);
     });
 
-    playerTask.stderr.on("data", (data) => {
-      if (DEBUG) console.error(`stderr: ${data}`);
+    vlcPlayer.stderr.on("data", (data) => {
+      if (DEBUG) console.error(`[VLC] stderr: ${data}`);
     });
 
-    playerTask.on("close", (code) => {
-      console.log(`child process exited with code ${code}`);
+    vlcPlayer.on("close", (code) => {
+      console.log(`[VLC] exit with code ${code}`);
+      clearInterval(udpTimer);
+      vlcPlayerTask = undefined;
+      State.file = "";
+      State.isPlaying = false;
     });
-    resolve(playerTask);
+    resolve(vlcPlayer);
   });
 }
 
-async function VlcPlayFile(file, volume = Volume) {
+async function vlcBlockPlaying() {
   return new Promise(async (resolve, reject) => {
+    if (vlcPlayerTask != undefined) {
+      const checkIntervall = setInterval(async () => {
+        if (vlcPlayerTask) {
+          if (DEBUG) console.log("[VLC] The process is still running.");
+        } else {
+          if (DEBUG) console.log("[VLC] The process has exited.");
+          clearInterval(checkIntervall);
+          resolve(true);
+        }
+      }, 1000);
+    } else {
+      resolve(true);
+    }
+  });
+}
+
+async function vlcPlayFile(file, volume = Volume) {
+  return new Promise(async (resolve, reject) => {
+    vlcKill();
     vlcPlayerTask = await vlcPlayer(file);
+  });
+}
+async function vlcPlayFileLoop(file, volume = Volume) {
+  return new Promise(async (resolve, reject) => {
+    while (true) {
+      await vlcKill();
+      vlcPlayerTask = await vlcPlayer(file);
+      await vlcBlockPlaying();
+    }
   });
 }
 
@@ -169,6 +262,9 @@ function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
     customFunction.call({
       OmxPlayFile,
       OmxPlayFileLoop,
+      vlcPlayFile,
+      vlcPlayFileLoop,
+      vlcKill,
       getFileById,
       getIdByFile,
       RestartMain,
@@ -205,6 +301,9 @@ function attachButton(Trigger /*number, file, isrepeat = false, isdefault = fals
         customFunction.call({
           OmxPlayFile,
           OmxPlayFileLoop,
+          vlcPlayFile,
+          vlcPlayFileLoop,
+          vlcKill,
           getFileById,
           getIdByFile,
           OmxKill,
@@ -247,8 +346,26 @@ Parser.init({ configpath: "./media/", configfile: "config_files.json" }).then(fu
     }
 
     console.log("----------INIT DONE-----------------");
-    VlcPlayFile("media/testvid.mp4");
   });
+});
+
+async function sendPostion(ID, FILE) {
+  if (State.hasOwnProperty("isPlaying") && State.isPlaying == false) return;
+  var vlcResult = await vlcGetTime();
+  if (vlcResult == undefined || vlcResult == false) return;
+  var timedata = Date.now();
+  console.log("[UDP ] send position: " + vlcResult);
+  //Example : "2%sync.mp4%42558%1690464636403" position in ms, timedata in ts(ms) = Date.now();
+  var sendstring = ID + "%" + FILE + "%" + vlcResult.toString() + "%" + timedata.toString();
+  socket.setBroadcast(true);
+  socket.send(sendstring, 0, sendstring.length, 6666, "255.255.255.255");
+}
+
+socket.bind("6666");
+
+socket.on("listening", function () {
+  const address = socket.address();
+  console.log("[UDP] socket listening on " + address.address + ":" + address.port);
 });
 
 process.on("SIGINT", (_) => {
