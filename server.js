@@ -18,7 +18,7 @@ var State = {};
 var vlcPlayerTask;
 var PlayerTask = null;
 var udpTimer;
-var RPI = false;
+var ISINTEL = false;
 
 var DEBUG = false;
 var STATION_ID = 0;
@@ -63,6 +63,10 @@ function buttonBlock() {
 }
 
 function OmxKill() {
+  if (ISINTEL) {
+    console.log("Function not supported for this device");
+    return false;
+  }
   return new Promise(function (resolve, reject) {
     if (PlayerTask != null) {
       buttonBlock();
@@ -79,6 +83,10 @@ function OmxKill() {
 }
 
 async function OmxPlayFile(file, volume = Volume) {
+  if (ISINTEL) {
+    console.log("Function not supported for this device");
+    return false;
+  }
   return new Promise((resolve, reject) => {
     if (!BlockButton) {
       OmxKill().then((result) => {
@@ -228,6 +236,10 @@ async function vlcPlayFileLoop(file, volume = Volume) {
 }
 
 async function OmxPlayFileLoop(file, volume = Volume) {
+  if (ISINTEL) {
+    console.log("Function not supported for this device");
+    return false;
+  }
   while (true) {
     await OmxPlayFile(file, volume);
     if (BlockButton) {
@@ -338,7 +350,7 @@ Parser.init({ configpath: "./media/", configfile: "config_files.json" }).then(fu
   Parser.parseConfig().then((Config) => {
     //console.log("By ID XX " + Parser.getFileById(23));
     MainFunction();
-    if (RPI) {
+    if (!ISINTEL) {
       for (var i = 0; i < Config.trigger.length; i++) {
         if (Config.trigger[i].gpio != undefined) {
           console.log("[MAIN] --- attach gpio: " + Config.trigger[i].gpio + "---");
