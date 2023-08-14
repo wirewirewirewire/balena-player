@@ -16,6 +16,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	dbus && \
 	apt-get clean && rm -rf /var/lib/apt/lists/*
 
+#drivers to install
+RUN install_packages \
+	libgles2-mesa \
+	mesa-vdpau-drivers \
+	xserver-xorg-video-fbdev \
+	libgl1-mesa-dri \
+	libglx-mesa0 \
+	mesa-vulkan-drivers \
+	alsa-utils \
+	libasound2-dev \
+	xterm
+
 # Defines our working directory in container
 WORKDIR /usr/src/app
 
