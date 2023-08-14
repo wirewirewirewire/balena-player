@@ -57,7 +57,7 @@ var killall = function (pid, signal, callback) {
 function buttonBlock() {
   BlockButton = true;
   setTimeout(function () {
-    console.log("--------Button Released-----------");
+    console.log("[MAIN] --- button release ---");
     BlockButton = false;
   }, 500);
 }
@@ -66,7 +66,7 @@ function OmxKill() {
   return new Promise(function (resolve, reject) {
     if (PlayerTask != null) {
       buttonBlock();
-      console.log("Kill Player PID" + PlayerTask.pid);
+      console.log("[OMX] kill player with pid" + PlayerTask.pid);
       //killed_uid = PlayerTask.pid;
       //PlayerTask.stdin.write("q");
       killall(PlayerTask.pid, "SIGKILL", function () {
@@ -82,13 +82,13 @@ async function OmxPlayFile(file, volume = Volume) {
   return new Promise((resolve, reject) => {
     if (!BlockButton) {
       OmxKill().then((result) => {
-        console.log("Play Video: " + file);
+        console.log("[OMX] play file: " + file);
         State.file = file;
         State.fileId = Parser.getIdByFile(file);
         State.isPlaying = true;
         PlayerTask = exec("omxplayer -o local --vol " + volume + " " + file);
         PlayerTask.on("exit", (code) => {
-          console.log("child process exited with code " + code);
+          console.log("[OMX] child process exited with code " + code);
           if (code == 0) {
             State.isPlaying = false;
           }
@@ -98,7 +98,7 @@ async function OmxPlayFile(file, volume = Volume) {
         //return true;
       });
     } else {
-      console.log("Button still blocked");
+      console.log("[OMX] button blocked ...");
     }
   });
 }
@@ -114,7 +114,7 @@ async function vlcKill() {
       clearInterval(udpTimer);
       resolve(true);
     } else {
-      console.log("[VLC] no player task");
+      if (DEBUG) console.log("[VLC] no player task");
       resolve(false);
     }
   });
@@ -125,7 +125,7 @@ let vlcGetTime = async function () {
     if (DEBUG) console.log("[VLC] get time");
     exec(getVlcTimeCmd, (error, stdout, stderr) => {
       if (error) {
-        console.log(`Error: ${error.message}`);
+        console.log(`[VLC] get time Error: ${error.message}`);
         resolve(false);
         return;
       }
@@ -134,7 +134,7 @@ let vlcGetTime = async function () {
         resolve(false);
         return;
       }
-      if (DEBUG) console.log(`stdout: ${stdout}`);
+      if (DEBUG) console.log(`[VLC] get time stdout: ${stdout}`);
       let match = stdout.match(/(\d+)(?![\s\S]*\d)/);
       let lastNumber = match ? match[0] : null;
       lastNumber = Math.floor(lastNumber / 1000);
@@ -159,13 +159,15 @@ async function vlcPlayer(file, loop = false, volume = Volume, audio = false, ful
   if (!audio) {
     playerParams.push("--no-audio");
   }
+  //TODO check if we need to start fullsccreen or if performance is better without
   if (fullscreen) {
     playerParams.push("-f");
   }
   playerParams.push(fileName);
 
   return new Promise(async (resolve, reject) => {
-    console.log("[VLC] start file: " + fileName + " with params: " + playerParams);
+    console.log("[VLC] start file: " + fileName);
+    if (DEBUG) console.log("[VLC]  params: " + playerParams);
 
     udpTimer = setInterval(async () => {
       sendPostion(STATION_ID, State.file);
@@ -196,9 +198,9 @@ async function vlcBlockPlaying() {
     if (vlcPlayerTask != undefined) {
       const checkIntervall = setInterval(async () => {
         if (vlcPlayerTask) {
-          if (DEBUG) console.log("[VLC] The process is still running.");
+          if (DEBUG) console.log("[VLC] block - The process is still running.");
         } else {
-          if (DEBUG) console.log("[VLC] The process has exited.");
+          if (DEBUG) console.log("[VLC] block - The process has exited.");
           clearInterval(checkIntervall);
           resolve(true);
         }
@@ -229,7 +231,7 @@ async function OmxPlayFileLoop(file, volume = Volume) {
   while (true) {
     await OmxPlayFile(file, volume);
     if (BlockButton) {
-      console.log("EXIT OMX LOOP");
+      console.log("[OMX] end of play loop");
       break;
     }
   }
@@ -249,7 +251,7 @@ function StartMain() {
 
 function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
   if (StopMainFunction || BlockButton) return;
-  console.log("-----START MAIN----");
+  console.log("[MAIN] --- start main loop ---");
   //if (mainFunction != null) {
   var customFunction = new AsyncFunction(mainFunction);
   //customFunction = new AsyncFunction(customFunction);
@@ -276,7 +278,7 @@ function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
     });
     //setTimeout(MainFunction(mainFunction), 5000);
   } catch (e) {
-    console.log("Import Code Error ");
+    console.log("[MAIN] Import Code Error ");
     console.log(e);
   }
   /*} else {
@@ -289,7 +291,7 @@ function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
 function attachButton(Trigger /*number, file, isrepeat = false, isdefault = false*/) {
   Buttons[Trigger.gpio] = new Gpio(Trigger.gpio, "in", "falling", { debounceTimeout: 50 });
   Buttons[Trigger.gpio].watch((err, value) => {
-    console.log("-----Button Trigger GPIO: " + Trigger.gpio + "------");
+    console.log("[MAIN] ---Button Trigger GPIO: " + Trigger.gpio + "---");
     if (Trigger.customFunction != null) {
       //StopMain();
       var customFunction = new AsyncFunction(Trigger.customFunction);
@@ -315,22 +317,22 @@ function attachButton(Trigger /*number, file, isrepeat = false, isdefault = fals
           State,
         });
       } catch (e) {
-        console.log("Import Code Error");
+        console.log("[MAIN] trigger Import Code Error");
         console.log(e);
       }
     } else {
-      console.log("No Function for GPIO: " + Trigger.gpio);
+      console.log("[MAIN] No Function for GPIO: " + Trigger.gpio);
     }
   });
 }
-
+//TODO check all files changes because more config files now
 Parser.init({ configpath: "./media/", configfile: "config_files.json" }).then(function () {
-  fs.watchFile(Parser.getConfigPath(), (curr, prev) => {
-    console.log("Restart from File Change: " + Parser.getConfigPath());
-    OmxKill().then(() => {
-      process.kill(process.pid, "SIGUSR2");
-      process.exit();
-    });
+  fs.watchFile(Parser.getConfigPath(), async (curr, prev) => {
+    console.log("[MAIN] file changed, restart: " + Parser.getConfigPath());
+    await vlcKill();
+    await OmxKill();
+    process.kill(process.pid, "SIGUSR2");
+    process.exit();
   });
   Volume = Parser.checkENV("VOLUME", 500);
   Parser.parseConfig().then((Config) => {
@@ -339,13 +341,13 @@ Parser.init({ configpath: "./media/", configfile: "config_files.json" }).then(fu
     if (RPI) {
       for (var i = 0; i < Config.trigger.length; i++) {
         if (Config.trigger[i].gpio != undefined) {
-          console.log("----------NEW BUTTON GPIO: " + Config.trigger[i].gpio + "--------");
+          console.log("[MAIN] --- attach gpio: " + Config.trigger[i].gpio + "---");
           attachButton(Config.trigger[i]);
         }
       }
     }
 
-    console.log("----------INIT DONE-----------------");
+    console.log("[MAIN] --- INIT DONE ---");
   });
 });
 
@@ -354,7 +356,7 @@ async function sendPostion(ID, FILE) {
   var vlcResult = await vlcGetTime();
   if (vlcResult == undefined || vlcResult == false) return;
   var timedata = Date.now();
-  console.log("[UDP ] send position: " + vlcResult);
+  if (DEBUG) console.log("[UDP] send position: " + vlcResult);
   //Example : "2%sync.mp4%42558%1690464636403" position in ms, timedata in ts(ms) = Date.now();
   var sendstring = ID + "%" + FILE + "%" + vlcResult.toString() + "%" + timedata.toString();
   socket.setBroadcast(true);
