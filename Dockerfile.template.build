@@ -1,0 +1,74 @@
+# base-image for node on any machine using a template variable,
+# see more about dockerfile templates here: https://www.balena.io/docs/learn/develop/dockerfile/#dockerfile-templates
+# and about balena base images here: https://www.balena.io/docs/reference/base-images/base-images/
+#FROM balenalib/raspberrypi3-node:10-buster-run
+
+# build vlc nightly
+FROM balenalib/%%BALENA_MACHINE_NAME%%:bullseye-build AS vlcbuild
+
+WORKDIR /usr/src/app
+
+RUN echo "deb-src http://deb.debian.org/debian/ bullseye main contrib non-free" | sudo tee -a /etc/apt/sources.list
+
+RUN install_packages git build-essential pkg-config libtool flex bison\
+	autoconf automake autopoint gettext cmake yasm \
+	liba52-0.7.4-dev libmpeg2-4-dev libmad0-dev \
+	libogg-dev libvorbis-dev libflac-dev libtheora-dev libdca-dev \
+	libfaad-dev libavcodec-dev libavformat-dev libpostproc-dev libavutil-dev \
+	libdvdnav-dev libdvdread-dev libswscale-dev libbluray-dev libvpx-dev \
+	libx264-dev libx265-dev libopus-dev \
+	lua5.2 liblua5.1-0-dev lua5.1 \
+	xcb libxcb1-dev libxcb-shm0-dev libxcb-render0-dev \
+	libxcb-composite0-dev libxcb-randr0-dev libxcb-xkb-dev \
+	qtbase5-dev qtquickcontrols2-5-dev qtdeclarative5-dev libqt5svg5-dev \
+	libx11-dev xserver-xorg-input-evdev xserver-xorg-core \
+	xinit lxsession x11-xserver-utils libasound2-dev alsa-utils \
+	libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers xserver-xorg-video-all \
+	libqt5x11extras5 libqt5x11extras5-dev checkinstall
+
+RUN install_packages devscripts debhelper autotools-dev libgtk-3-dev intltool yasm
+RUN apt update && apt-get build-dep vlc
+
+
+RUN git clone https://code.videolan.org/videolan/vlc.git
+RUN cd vlc && ./bootstrap && ./configure && make && make install && \
+	checkinstall -D --pkgname=vlc --pkgversion=4.0 --pkggroup=multimedia --requires="" --backup=no -y make install
+
+FROM balenalib/%%BALENA_MACHINE_NAME%%-node:16-bullseye-run
+
+# use `install_packages` if you need to install dependencies,
+# for instance if you need git, just uncomment the line below.
+# RUN install_packages git
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	#vlc \
+	python3 \
+	build-essential \
+	dbus-x11 \
+	dbus && \
+	apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Defines our working directory in container
+WORKDIR /usr/src/app
+
+# Copies the package.json first for better cache on later pushes
+COPY package.json package.json
+
+# This install npm dependencies on the balena build server,
+# making sure to clean up the artifacts it creates in order to reduce the image size.
+RUN JOBS=MAX npm install -g nodemon
+RUN JOBS=MAX npm install --production --unsafe-perm && npm cache verify && rm -rf /tmp/*
+# Enable udevd so that plugged dynamic hardware devices show up in our container.
+ENV UDEV=1
+ENV DISPLAY=:0
+
+COPY --from=vlcbuild /usr/src/app/vlc/vlc_4.0-1_arm64.deb .
+RUN dpkg -i ./vlc_4.0-1_arm64.deb
+RUN install_packages libvlc-dev vlc-plugin-*
+
+# This will copy all files in our root to the working directory in the container
+COPY . ./
+
+# server.js will run when container starts up on the device
+#CMD ["npm", "start"]
+CMD ["bash", "/usr/src/app/init"]
