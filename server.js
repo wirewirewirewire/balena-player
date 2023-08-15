@@ -112,10 +112,10 @@ async function OmxPlayFile(file, volume = Volume) {
 }
 
 async function vlcKill() {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     if (vlcPlayerTask != undefined) {
       console.log("[VLC] kill VLC player");
-      vlcPlayerTask.kill();
+      await vlcPlayerTask.kill();
       vlcPlayerTask = undefined;
       State.file = "";
       State.isPlaying = false;
@@ -131,6 +131,10 @@ async function vlcKill() {
 let vlcGetTime = async function () {
   return new Promise(async (resolve, reject) => {
     if (DEBUG) console.log("[VLC] get time");
+    if (vlcPlayerTask == undefined) {
+      resolve(0);
+      return;
+    }
     exec(getVlcTimeCmd, (error, stdout, stderr) => {
       if (error) {
         console.log(`[VLC] get time Error: ${error.message}`);
@@ -210,7 +214,9 @@ async function vlcBlockPlaying() {
         } else {
           if (DEBUG) console.log("[VLC] block - The process has exited.");
           clearInterval(checkIntervall);
-          resolve(true);
+          setTimeout(() => {
+            resolve(true);
+          }, 200);
         }
       }, 1000);
     } else {
@@ -221,7 +227,7 @@ async function vlcBlockPlaying() {
 
 async function vlcPlayFile(file, volume = Volume) {
   return new Promise(async (resolve, reject) => {
-    vlcKill();
+    await vlcKill();
     vlcPlayerTask = await vlcPlayer(file);
   });
 }
