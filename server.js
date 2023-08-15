@@ -155,7 +155,7 @@ let vlcGetTime = async function () {
   });
 };
 
-async function vlcPlayer(file, loop = false, volume = Volume, audio = false, fullscreen = true) {
+async function vlcPlayer(file, loop = false, volume = Volume, audio = false, fullscreen = false) {
   var fileName = file;
   try {
     State.file = path.basename(fileName);
