@@ -1,7 +1,7 @@
 name: player
 description: >-
   Player frontend to play files with VLC on a seperate x-server on the device.
-version: 0.1.0
+version: 0.1.1
 type: sw.block
 assets:
   repository:
