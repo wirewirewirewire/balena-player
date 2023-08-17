@@ -157,12 +157,9 @@ let vlcGetTime = async function () {
 
 async function vlcPlayer(file, loop = false, volume = Volume, audio = false, fullscreen = false) {
   var fileName = file;
-  try {
-    State.file = path.basename(fileName);
-  } catch (error) {
-    console.log("[VLC] ERR no valid file path");
-    return false;
-  }
+
+  //TODO check if file or url
+
   State.isPlaying = true;
   playerParams = ["--no-osd", "--play-and-exit", "--control", "dbus"];
   if (loop) {
@@ -229,6 +226,8 @@ async function vlcPlayFile(file, volume = Volume) {
   return new Promise(async (resolve, reject) => {
     await vlcKill();
     vlcPlayerTask = await vlcPlayer(file);
+    await vlcBlockPlaying();
+    resolve(true);
   });
 }
 async function vlcPlayFileLoop(file, volume = Volume) {
@@ -344,7 +343,7 @@ function attachButton(Trigger /*number, file, isrepeat = false, isdefault = fals
   });
 }
 //TODO check all files changes because more config files now
-Parser.init({ configpath: "./media/", configfile: "config_files.json" }).then(function () {
+Parser.init({ configpath: "./media/", configfile: "data_files.json" }).then(function () {
   fs.watchFile(Parser.getConfigPath(), async (curr, prev) => {
     console.log("[MAIN] file changed, restart: " + Parser.getConfigPath());
     await vlcKill();

@@ -61,25 +61,27 @@ module.exports = {
     return new Promise((resolve, reject) => {
       //console.log(configfile);
       //console.log(util.inspect(ConfigFile, { showHidden: false, depth: null }));
-      var fileCount = getSafe(() => ConfigFile.deviceKind[0].files.length, 0);
-      var triggerCount = getSafe(() => ConfigFile.deviceKind[0].Trigger.length, 0);
+      var fileCount = getSafe(() => ConfigFile.data.post.entries.length, 0);
+      var triggerCount = getSafe(() => ConfigFile.data.post.trigger.length, 0);
 
-      Config = { files: [], trigger: [], mainfunction: null };
+      Config = { files: [], trigger: [], mainfunction: null, station: null };
       for (var i = 0; i < fileCount; i++) {
         let newFile = {
-          id: getSafe(() => ConfigFile.deviceKind[0].files[i].id, null),
-          file: getSafe(() => ConfigFile.deviceKind[0].files[i].file.url, null),
-          fileconfig: getSafe(() => ConfigFile.deviceKind[0].files[i].fileconfig, null),
-        };
+          id: getSafe(() => ConfigFile.data.post.entries[i].files[0].id, null),
+          file: getSafe(() => ConfigFile.data.post.entries[i].files[0].file.url, null),
+          slug: getSafe(() => ConfigFile.data.post.entries[i].slug, null),
+        };//TODO: add maybe conversion of file url to slug (only file name)
         Config.files.push(newFile);
       }
       for (var i = 0; i < triggerCount; i++) {
-        Config.trigger.push(getSafe(() => ConfigFile.deviceKind[0].Trigger[i], null));
+        Config.trigger.push(getSafe(() => ConfigFile.data.post.entries[i].trigger, null));
       }
-      Config.mainfunction = getSafe(() => ConfigFile.deviceKind[0].mainFunction, null);
+      Config.mainfunction = getSafe(() => ConfigFile.data.post.content, null);
+      Config.station= getSafe(() => ConfigFile.data.post.stationId, null),
 
+
+      console.log(util.inspect(Config, { showHidden: false, depth: null }));
       console.log("Parsed: Files: " + fileCount + " Trigger: " + triggerCount);
-      //console.log(util.inspect(Config, { showHidden: false, depth: null }));
 
       resolve(Config);
     });
@@ -99,12 +101,13 @@ module.exports = {
   //Get File URL from Strapi Field ID
   getFileById: function (id) {
     for (var i = 0; i < getSafe(() => Config.files).length; i++) {
-      if (getSafe(() => Config.files[i].id) === id) return CONFIGPATH.substring(0, CONFIGPATH.length - 1) + getSafe(() => Config.files[i].file);
+      if (getSafe(() => Config.files[i].id) === id) return Config.files[i].file;
     }
     return null;
   },
   getIdByFile: function (file) {
-    var file = file.replace(CONFIGPATH, "/");
+    //var file = file.replace(CONFIGPATH, "/");
+
     for (var i = 0; i < getSafe(() => Config.files).length; i++) {
       //console.log(file);
       //console.log(Config.files[i].file);
