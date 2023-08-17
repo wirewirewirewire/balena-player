@@ -59,26 +59,23 @@ module.exports = {
 */
   parseConfig: function () {
     return new Promise((resolve, reject) => {
-      //console.log(configfile);
-      //console.log(util.inspect(ConfigFile, { showHidden: false, depth: null }));
       var fileCount = getSafe(() => ConfigFile.data.post.entries.length, 0);
       var triggerCount = getSafe(() => ConfigFile.data.post.trigger.length, 0);
 
-      Config = { files: [], trigger: [], mainfunction: null, station: null };
+      Config = { files: [], trigger: [], mainfunction: null, stationName: null };
       for (var i = 0; i < fileCount; i++) {
         let newFile = {
           id: getSafe(() => ConfigFile.data.post.entries[i].files[0].id, null),
           file: getSafe(() => ConfigFile.data.post.entries[i].files[0].file.url, null),
-          slug: getSafe(() => ConfigFile.data.post.entries[i].slug, null),
-        };//TODO: add maybe conversion of file url to slug (only file name)
+          slug: getSafe(() => ConfigFile.data.post.entries[i].slug, null), //TODO: add this to config file, get file by slug, relevant for udp broadcast
+        };
         Config.files.push(newFile);
       }
       for (var i = 0; i < triggerCount; i++) {
         Config.trigger.push(getSafe(() => ConfigFile.data.post.entries[i].trigger, null));
       }
       Config.mainfunction = getSafe(() => ConfigFile.data.post.content, null);
-      Config.station= getSafe(() => ConfigFile.data.post.stationId, null),
-
+      Config.stationName = getSafe(() => ConfigFile.data.post.stationName, null); //TODO: add this to config file, relevant for udp broadcast
 
       console.log(util.inspect(Config, { showHidden: false, depth: null }));
       console.log("Parsed: Files: " + fileCount + " Trigger: " + triggerCount);

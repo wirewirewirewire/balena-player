@@ -1,12 +1,11 @@
 const util = require("util");
 var path = require("path");
-var psTree = require("ps-tree");
-const Gpio = require("onoff").Gpio;
-const { exec, spawn } = require("child_process");
 var fs = require("fs");
-const Parser = require("./parser.js");
 const dgram = require("dgram");
+const Gpio = require("onoff").Gpio;
 const socket = dgram.createSocket("udp4");
+const { exec, spawn } = require("child_process");
+const Parser = require("./parser.js");
 
 const env = Object.create(process.env);
 env.DISPLAY = ":0";
@@ -16,43 +15,15 @@ const getVlcTimeCmd = `DISPLAY=:0 dbus-send --print-reply --session --dest=org.m
 const Buttons = [];
 var State = {};
 var vlcPlayerTask;
-var PlayerTask = null;
 var udpTimer;
-var ISINTEL = false;
+var ISINTEL = Parser.checkENV("ISINTEL", true);
 
-var DEBUG = false;
+var DEBUG = Parser.checkENV("DEBUG", false);
 var STATION_ID = 0;
 
 var BlockButton = false;
 var StopMainFunction = false;
 var Volume = 500;
-
-var killall = function (pid, signal, callback) {
-  signal = signal || "SIGKILL";
-  callback = callback || function () {};
-  var killTree = true;
-  if (killTree) {
-    psTree(pid, function (err, children) {
-      [pid]
-        .concat(
-          children.map(function (p) {
-            return p.PID;
-          })
-        )
-        .forEach(function (tpid) {
-          try {
-            process.kill(tpid, signal);
-          } catch (ex) {}
-        });
-      callback();
-    });
-  } else {
-    try {
-      process.kill(pid, signal);
-    } catch (ex) {}
-    callback();
-  }
-};
 
 function buttonBlock() {
   BlockButton = true;
@@ -62,62 +33,15 @@ function buttonBlock() {
   }, 500);
 }
 
-function OmxKill() {
-  if (ISINTEL) {
-    console.log("Function not supported for this device");
-    return false;
-  }
-  return new Promise(function (resolve, reject) {
-    if (PlayerTask != null) {
-      buttonBlock();
-      console.log("[OMX] kill player with pid" + PlayerTask.pid);
-      //killed_uid = PlayerTask.pid;
-      //PlayerTask.stdin.write("q");
-      killall(PlayerTask.pid, "SIGKILL", function () {
-        resolve(true);
-      });
-    } else {
-      resolve(true);
-    }
-  });
-}
-
-async function OmxPlayFile(file, volume = Volume) {
-  if (ISINTEL) {
-    console.log("Function not supported for this device");
-    return false;
-  }
-  return new Promise((resolve, reject) => {
-    if (!BlockButton) {
-      OmxKill().then((result) => {
-        console.log("[OMX] play file: " + file);
-        State.file = file;
-        State.fileId = Parser.getIdByFile(file);
-        State.isPlaying = true;
-        PlayerTask = exec("omxplayer -o local --vol " + volume + " " + file);
-        PlayerTask.on("exit", (code) => {
-          console.log("[OMX] child process exited with code " + code);
-          if (code == 0) {
-            State.isPlaying = false;
-          }
-          resolve(true);
-          //console.log(util.inspect(PlayerTask, { showHidden: false, depth: null }));
-        });
-        //return true;
-      });
-    } else {
-      console.log("[OMX] button blocked ...");
-    }
-  });
-}
-
 async function vlcKill() {
   return new Promise(async (resolve, reject) => {
     if (vlcPlayerTask != undefined) {
+      buttonBlock();
       console.log("[VLC] kill VLC player");
       await vlcPlayerTask.kill();
       vlcPlayerTask = undefined;
       State.file = "";
+      State.fileId = "";
       State.isPlaying = false;
       clearInterval(udpTimer);
       resolve(true);
@@ -161,6 +85,9 @@ async function vlcPlayer(file, loop = false, volume = Volume, audio = false, ful
   //TODO check if file or url
 
   State.isPlaying = true;
+  State.file = file;
+  State.fileId = Parser.getIdByFile(file);
+
   playerParams = ["--no-osd", "--play-and-exit", "--control", "dbus"];
   if (loop) {
     playerParams.push("--loop");
@@ -196,6 +123,7 @@ async function vlcPlayer(file, loop = false, volume = Volume, audio = false, ful
       clearInterval(udpTimer);
       vlcPlayerTask = undefined;
       State.file = "";
+      State.fileId = "";
       State.isPlaying = false;
     });
     resolve(vlcPlayer);
@@ -240,20 +168,6 @@ async function vlcPlayFileLoop(file, volume = Volume) {
   });
 }
 
-async function OmxPlayFileLoop(file, volume = Volume) {
-  if (ISINTEL) {
-    console.log("Function not supported for this device");
-    return false;
-  }
-  while (true) {
-    await OmxPlayFile(file, volume);
-    if (BlockButton) {
-      console.log("[OMX] end of play loop");
-      break;
-    }
-  }
-}
-
 function StopMain() {
   return new Promise((resolve, reject) => {
     StopMainFunction = true;
@@ -269,9 +183,7 @@ function StartMain() {
 function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
   if (StopMainFunction || BlockButton) return;
   console.log("[MAIN] --- start main loop ---");
-  //if (mainFunction != null) {
   var customFunction = new AsyncFunction(mainFunction);
-  //customFunction = new AsyncFunction(customFunction);
   var Config = new Parser.getConfig();
   var getFileById = Parser.getFileById;
   var getIdByFile = Parser.getIdByFile;
@@ -279,8 +191,6 @@ function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
 
   try {
     customFunction.call({
-      OmxPlayFile,
-      OmxPlayFileLoop,
       vlcPlayFile,
       vlcPlayFileLoop,
       vlcKill,
@@ -289,7 +199,6 @@ function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
       RestartMain,
       StartMain,
       StopMain,
-      OmxKill,
       Config,
       State,
     });
@@ -318,14 +227,11 @@ function attachButton(Trigger /*number, file, isrepeat = false, isdefault = fals
       var getIdByFile = Parser.getIdByFile;
       try {
         customFunction.call({
-          OmxPlayFile,
-          OmxPlayFileLoop,
           vlcPlayFile,
           vlcPlayFileLoop,
           vlcKill,
           getFileById,
           getIdByFile,
-          OmxKill,
           RestartMain,
           StartMain,
           StopMain,
@@ -347,12 +253,12 @@ Parser.init({ configpath: "./media/", configfile: "data_files.json" }).then(func
   fs.watchFile(Parser.getConfigPath(), async (curr, prev) => {
     console.log("[MAIN] file changed, restart: " + Parser.getConfigPath());
     await vlcKill();
-    await OmxKill();
     process.kill(process.pid, "SIGUSR2");
     process.exit();
   });
   Volume = Parser.checkENV("VOLUME", 500);
   Parser.parseConfig().then((Config) => {
+    STATION_ID = Config.stationName;
     //console.log("By ID XX " + Parser.getFileById(23));
     MainFunction();
     if (!ISINTEL) {
