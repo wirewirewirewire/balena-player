@@ -19,11 +19,21 @@ var udpTimer;
 var ISINTEL = Parser.checkENV("ISINTEL", true);
 
 var DEBUG = Parser.checkENV("DEBUG", false);
-var STATION_ID = 0;
 
 var BlockButton = false;
 var StopMainFunction = false;
 var Volume = 500;
+var BalenaRelease;
+
+function IsJsonString(str) {
+  var result;
+  try {
+    result = JSON.parse(str);
+  } catch (e) {
+    return str;
+  }
+  return result;
+}
 
 function buttonBlock() {
   BlockButton = true;
@@ -31,6 +41,27 @@ function buttonBlock() {
     console.log("[MAIN] --- button release ---");
     BlockButton = false;
   }, 500);
+}
+
+function getBalenaRelease() {
+  return new Promise((resolve, reject) => {
+    exec(
+      'curl -X GET --header "Content-Type:application/json" "$BALENA_SUPERVISOR_ADDRESS/v1/device?apikey=$BALENA_SUPERVISOR_API_KEY"',
+      (error, stdout, stderr) => {
+        if (error) {
+          //console.log(`error: ${error.message}`);
+          resolve(false);
+          return;
+        }
+        if (stderr) {
+          //console.log(`stderr: ${stderr}`);
+          //resolve(stderr);
+          //return;
+        }
+        resolve(IsJsonString(stdout));
+      }
+    );
+  });
 }
 
 async function vlcKill() {
@@ -43,6 +74,7 @@ async function vlcKill() {
       State.file = "";
       State.fileId = "";
       State.isPlaying = false;
+      State.fileSlug = "";
       clearInterval(udpTimer);
       resolve(true);
     } else {
@@ -70,7 +102,7 @@ let vlcGetTime = async function () {
         resolve(false);
         return;
       }
-      if (DEBUG) console.log(`[VLC] get time stdout: ${stdout}`);
+      //if (DEBUG) console.log(`[VLC] get time stdout: ${stdout}`);
       let match = stdout.match(/(\d+)(?![\s\S]*\d)/);
       let lastNumber = match ? match[0] : null;
       lastNumber = Math.floor(lastNumber / 1000);
@@ -87,6 +119,7 @@ async function vlcPlayer(file, loop = false, volume = Volume, audio = false, ful
   State.isPlaying = true;
   State.file = file;
   State.fileId = Parser.getIdByFile(file);
+  State.fileSlug = Parser.getSlugByFile(file);
 
   playerParams = ["--no-osd", "--play-and-exit", "--control", "dbus"];
   if (loop) {
@@ -106,7 +139,7 @@ async function vlcPlayer(file, loop = false, volume = Volume, audio = false, ful
     if (DEBUG) console.log("[VLC]  params: " + playerParams);
 
     udpTimer = setInterval(async () => {
-      sendPostion(STATION_ID, State.file);
+      sendPostion(Parser.getConfig().stationName, State.fileSlug);
     }, 1000);
     var vlcPlayer = spawn("cvlc", playerParams, { env: env });
 
@@ -125,6 +158,7 @@ async function vlcPlayer(file, loop = false, volume = Volume, audio = false, ful
       State.file = "";
       State.fileId = "";
       State.isPlaying = false;
+      State.fileSlug = "";
     });
     resolve(vlcPlayer);
   });
@@ -257,9 +291,11 @@ Parser.init({ configpath: "./media/", configfile: "data_files.json" }).then(func
     process.exit();
   });
   Volume = Parser.checkENV("VOLUME", 500);
-  Parser.parseConfig().then((Config) => {
-    STATION_ID = Config.stationName;
+  Parser.parseConfig().then(async (Config) => {
     //console.log("By ID XX " + Parser.getFileById(23));
+    BalenaRelease = await getBalenaRelease();
+    if (DEBUG) console.log(BalenaRelease);
+    let ipAddr = BalenaRelease.ip_address.split(" ");
     MainFunction();
     if (!ISINTEL) {
       for (var i = 0; i < Config.trigger.length; i++) {
@@ -279,9 +315,10 @@ async function sendPostion(ID, FILE) {
   var vlcResult = await vlcGetTime();
   if (vlcResult == undefined || vlcResult == false) return;
   var timedata = Date.now();
-  if (DEBUG) console.log("[UDP] send position: " + vlcResult);
   //Example : "2%sync.mp4%42558%1690464636403" position in ms, timedata in ts(ms) = Date.now();
   var sendstring = ID + "%" + FILE + "%" + vlcResult.toString() + "%" + timedata.toString();
+  if (DEBUG) console.log('[UDP] send : "' + sendstring + '"');
+
   socket.setBroadcast(true);
   socket.send(sendstring, 0, sendstring.length, 6666, "255.255.255.255");
 }
@@ -290,7 +327,7 @@ socket.bind("6666");
 
 socket.on("listening", function () {
   const address = socket.address();
-  console.log("[UDP] socket listening on " + address.address + ":" + address.port);
+  console.log("[UDP] socket on " + address.address + ":" + address.port);
 });
 
 process.on("SIGINT", (_) => {

@@ -1,5 +1,6 @@
 const util = require("util");
 const fs = require("fs");
+var DEBUG = checkENV("DEBUG", false);
 var CONFIGPATH;
 var CONFIGNAME;
 var ConfigFile;
@@ -14,7 +15,10 @@ function checkENV(ENV, alt_var, secret = false) {
     } else {
       console.log("Set " + ENV + " from ENV to: " + eval("process.env." + ENV));
     }
-    return eval("process.env." + ENV);
+    let newVar = eval("process.env." + ENV);
+    if (newVar == "true") newVar = true;
+    if (newVar == "false") newVar = false;
+    return newVar;
   } else {
     if (secret) {
       console.log("Set " + ENV + " from Default to: ***");
@@ -75,10 +79,10 @@ module.exports = {
         Config.trigger.push(getSafe(() => ConfigFile.data.post.entries[i].trigger, null));
       }
       Config.mainfunction = getSafe(() => ConfigFile.data.post.content, null);
-      Config.stationName = getSafe(() => ConfigFile.data.post.stationName, null); //TODO: add this to config file, relevant for udp broadcast
+      Config.stationName = getSafe(() => ConfigFile.data.post.slug, null); //TODO: add this to config file, relevant for udp broadcast
 
-      console.log(util.inspect(Config, { showHidden: false, depth: null }));
-      console.log("Parsed: Files: " + fileCount + " Trigger: " + triggerCount);
+      if (DEBUG) console.log(util.inspect(Config, { showHidden: false, depth: null }));
+      if (DEBUG) console.log("Parsed: Files: " + fileCount + " Trigger: " + triggerCount);
 
       resolve(Config);
     });
@@ -109,6 +113,16 @@ module.exports = {
       //console.log(file);
       //console.log(Config.files[i].file);
       if (getSafe(() => Config.files[i].file) === file) return getSafe(() => Config.files[i].id);
+    }
+    return null;
+  },
+  getSlugByFile: function (file) {
+    //var file = file.replace(CONFIGPATH, "/");
+
+    for (var i = 0; i < getSafe(() => Config.files).length; i++) {
+      //console.log(file);
+      //console.log(Config.files[i].file);
+      if (getSafe(() => Config.files[i].file) === file) return getSafe(() => Config.files[i].slug);
     }
     return null;
   },

@@ -5,6 +5,9 @@ volumes:
 services:
   balena-player:
     build: .
+    network_mode: host
+    ports:
+      - 6666:6666
     volumes:
       - "workdir:/usr/src/app/media" # drive to mount the media to play
       - "xserver:/tmp/.X11-unix" # external xserver
