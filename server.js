@@ -12,18 +12,18 @@ env.DISPLAY = ":0";
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const getVlcTimeCmd = `DISPLAY=:0 dbus-send --print-reply --session --dest=org.mpris.MediaPlayer2.vlc /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Get string:"org.mpris.MediaPlayer2.Player" string:"Position"`;
 
-const Buttons = [];
-var State = {};
 var vlcPlayerTask;
 var udpTimer;
+
 var ISINTEL = Parser.checkENV("ISINTEL", true);
-
 var DEBUG = Parser.checkENV("DEBUG", false);
+var Volume = Parser.checkENV("VOLUME", 500);
 
+const Buttons = [];
+var State = {};
+var BalenaRelease;
 var BlockButton = false;
 var StopMainFunction = false;
-var Volume = 500;
-var BalenaRelease;
 
 function IsJsonString(str) {
   var result;
@@ -54,6 +54,8 @@ function getBalenaRelease() {
           return;
         }
         if (stderr) {
+          resolve(false);
+          return;
           //console.log(`stderr: ${stderr}`);
           //resolve(stderr);
           //return;
@@ -136,6 +138,8 @@ async function vlcPlayer(file, loop = false, volume = Volume, audio = false, ful
 
   return new Promise(async (resolve, reject) => {
     console.log("[VLC] start file: " + fileName);
+    console.log('[UDP] stream will be: "' + Parser.getConfig().stationName + "%" + State.fileSlug + '%<playertime>%<unixtimestamp>"');
+
     if (DEBUG) console.log("[VLC]  params: " + playerParams);
 
     udpTimer = setInterval(async () => {
@@ -283,19 +287,22 @@ function attachButton(Trigger /*number, file, isrepeat = false, isdefault = fals
   });
 }
 //TODO check all files changes because more config files now
-Parser.init({ configpath: "./media/", configfile: "data_files.json" }).then(function () {
+Parser.init({ configpath: "./media/", configfile: "data_files.json" }, DEBUG).then(function () {
   fs.watchFile(Parser.getConfigPath(), async (curr, prev) => {
     console.log("[MAIN] file changed, restart: " + Parser.getConfigPath());
     await vlcKill();
     process.kill(process.pid, "SIGUSR2");
     process.exit();
   });
-  Volume = Parser.checkENV("VOLUME", 500);
   Parser.parseConfig().then(async (Config) => {
     //console.log("By ID XX " + Parser.getFileById(23));
     BalenaRelease = await getBalenaRelease();
-    if (DEBUG) console.log(BalenaRelease);
-    let ipAddr = BalenaRelease.ip_address.split(" ");
+    if (BalenaRelease != false) {
+      if (DEBUG) console.log(BalenaRelease);
+      //let ipAddr = BalenaRelease.ip_address.split(" ");
+    } else {
+      console.log("[MAIN] start local, no balena");
+    }
     MainFunction();
     if (!ISINTEL) {
       for (var i = 0; i < Config.trigger.length; i++) {

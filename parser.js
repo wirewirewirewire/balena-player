@@ -1,6 +1,8 @@
 const util = require("util");
 const fs = require("fs");
-var DEBUG = checkENV("DEBUG", false);
+var DEBUG = false;
+const axios = require("axios");
+
 var CONFIGPATH;
 var CONFIGNAME;
 var ConfigFile;
@@ -11,9 +13,9 @@ var Config;
 function checkENV(ENV, alt_var, secret = false) {
   if (eval("process.env." + ENV)) {
     if (secret) {
-      console.log("Set " + ENV + " from ENV to: ***");
+      console.log("[VAR] set " + ENV + " from ENV to: ***");
     } else {
-      console.log("Set " + ENV + " from ENV to: " + eval("process.env." + ENV));
+      console.log("[VAR] set " + ENV + " from ENV to: " + eval("process.env." + ENV));
     }
     let newVar = eval("process.env." + ENV);
     if (newVar == "true") newVar = true;
@@ -21,12 +23,30 @@ function checkENV(ENV, alt_var, secret = false) {
     return newVar;
   } else {
     if (secret) {
-      console.log("Set " + ENV + " from Default to: ***");
+      console.log("[VAR] set " + ENV + " from Default to: ***");
     } else {
-      console.log("Set " + ENV + " from Default to: " + alt_var);
+      console.log("[VAR] set " + ENV + " from Default to: " + alt_var);
     }
     return alt_var;
   }
+}
+
+async function getMimeTypeFromUrl(url) {
+  try {
+    const response = await axios.head(url);
+    return response.headers["content-type"];
+  } catch (error) {
+    console.error(`Error fetching the URL: ${error.message}`);
+    return null;
+  }
+}
+
+async function isVideoUrl(url) {
+  const mimeType = await getMimeTypeFromUrl(url);
+  if (!mimeType) {
+    return false;
+  }
+  return mimeType.startsWith("video/");
 }
 
 function getSafe(fn, defaultVal) {
@@ -38,7 +58,7 @@ function getSafe(fn, defaultVal) {
 }
 
 module.exports = {
-  init: function (settings = { configpath: "./media/", configfile: "config_files.json" }) {
+  init: function (settings = { configpath: "./media/", configfile: "config_files.json" }, debug) {
     return new Promise((resolve, reject) => {
       console.log("--------INIT PLAYER--------");
 
@@ -46,6 +66,7 @@ module.exports = {
       CONFIGNAME = checkENV("CONFIGNAME", settings.configfile);
       let rawdata = fs.readFileSync(CONFIGPATH + CONFIGNAME);
       ConfigFile = JSON.parse(rawdata);
+      DEBUG = debug;
       resolve(true);
     });
   },
@@ -62,18 +83,29 @@ module.exports = {
     }...]
 */
   parseConfig: function () {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       var fileCount = getSafe(() => ConfigFile.data.post.entries.length, 0);
       var triggerCount = getSafe(() => ConfigFile.data.post.trigger.length, 0);
+      let isFile = false;
 
       Config = { files: [], trigger: [], mainfunction: null, stationName: null };
-      for (var i = 0; i < fileCount; i++) {
+      for (let i = 0; i < fileCount; i++) {
         let newFile = {
-          id: getSafe(() => ConfigFile.data.post.entries[i].files[0].id, null),
-          file: getSafe(() => ConfigFile.data.post.entries[i].files[0].file.url, null),
+          id: getSafe(() => ConfigFile.data.post.entries[i].id, null),
+          title: getSafe(() => ConfigFile.data.post.entries[i].title, null),
           slug: getSafe(() => ConfigFile.data.post.entries[i].slug, null), //TODO: add this to config file, get file by slug, relevant for udp broadcast
         };
-        Config.files.push(newFile);
+        for (let j = 0; j < getSafe(() => ConfigFile.data.post.entries[i].files.length, 0); j++) {
+          let videoFileUrl = ConfigFile.data.post.entries[i].files[j].file.url;
+          let videoFileName = ConfigFile.data.post.entries[i].files[j].file.filename;
+          if (await isVideoUrl(videoFileUrl)) {
+            isFile = true;
+            newFile["file"] = videoFileUrl;
+            console.log("[PARSE] add file: " + videoFileName);
+            break;
+          }
+        }
+        if (isFile) Config.files.push(newFile);
       }
       for (var i = 0; i < triggerCount; i++) {
         Config.trigger.push(getSafe(() => ConfigFile.data.post.entries[i].trigger, null));
@@ -82,7 +114,7 @@ module.exports = {
       Config.stationName = getSafe(() => ConfigFile.data.post.slug, null); //TODO: add this to config file, relevant for udp broadcast
 
       if (DEBUG) console.log(util.inspect(Config, { showHidden: false, depth: null }));
-      if (DEBUG) console.log("Parsed: Files: " + fileCount + " Trigger: " + triggerCount);
+      if (DEBUG) console.log("[PARSE] Entries: " + fileCount + " Trigger: " + triggerCount);
 
       resolve(Config);
     });
