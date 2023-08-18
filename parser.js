@@ -96,21 +96,30 @@ module.exports = {
           title: getSafe(() => ConfigFile.data.post.entries[i].title, null),
           slug: getSafe(() => ConfigFile.data.post.entries[i].slug, null), //TODO: add this to config file, get file by slug, relevant for udp broadcast
         };
-        for (let j = 0; j < getSafe(() => ConfigFile.data.post.entries[i].files.length, 0); j++) {
-          let videoFileUrl = ConfigFile.data.post.entries[i].files[j].file.url;
-          let videoFileName = ConfigFile.data.post.entries[i].files[j].file.filename;
-          if (validUrl.isUri(videoFileUrl)) {
-            if (DEBUG) console.log(`[PARSE] is a valid URL.`);
-          } else {
-            if (DEBUG) console.log(`[PARSE] is not a valid URL.`);
+        filesArray = getSafe(() => ConfigFile.data.post.entries[i].files, []);
+        if (filesArray.length > 1) {
+          for (let j = 0; j < getSafe(() => filesArray.length, 0); j++) {
+            let videoFileUrl = getSafe(() => filesArray[j].file.url, null);
+            let videoFileName = getSafe(() => filesArray[j].file.filename, null);
+            if (validUrl.isUri(videoFileUrl)) {
+              if (DEBUG) console.log(`[PARSE] is a valid URL.`);
+            } else {
+              if (DEBUG) console.log(`[PARSE] is not a valid URL.`);
+            }
+            if (await isVideoUrl(videoFileUrl)) {
+              isFile = true;
+              newFile["file"] = videoFileUrl;
+              console.log("[PARSE] add file: " + videoFileName);
+              break;
+            }
           }
-          if (await isVideoUrl(videoFileUrl)) {
-            isFile = true;
-            newFile["file"] = videoFileUrl;
-            console.log("[PARSE] add file: " + videoFileName);
-            break;
-          }
-        }
+      } else if (filesArray.length == 1){
+        let videoFileUrl = getSafe(() => filesArray[0].file.url, null);
+        let videoFileName = getSafe(() => filesArray[0].file.filename, null);
+        isFile = true;
+        newFile["file"] = videoFileUrl;
+        console.log("[PARSE] add only file: " + videoFileName);
+      }
         if (isFile) Config.files.push(newFile);
       }
       for (var i = 0; i < triggerCount; i++) {

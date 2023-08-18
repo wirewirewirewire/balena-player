@@ -16,6 +16,6 @@ while [ ! -e /tmp/.X11-unix/X${DISPLAY#*:} ]; do sleep 0.5; done
 
 while true; do    
     npm run start
-    echo "Running"
-    sleep 60
+    echo "[VLC] restarting ..."
+    sleep 10
 done
