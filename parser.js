@@ -1,6 +1,7 @@
 const util = require("util");
 const fs = require("fs");
 var DEBUG = false;
+const validUrl = require("valid-url");
 const axios = require("axios");
 
 var CONFIGPATH;
@@ -36,7 +37,7 @@ async function getMimeTypeFromUrl(url) {
     const response = await axios.head(url);
     return response.headers["content-type"];
   } catch (error) {
-    console.error(`Error fetching the URL: ${error.message}`);
+    console.error(`[PARSE] Error fetching the URL: ${error.message}`);
     return null;
   }
 }
@@ -98,6 +99,11 @@ module.exports = {
         for (let j = 0; j < getSafe(() => ConfigFile.data.post.entries[i].files.length, 0); j++) {
           let videoFileUrl = ConfigFile.data.post.entries[i].files[j].file.url;
           let videoFileName = ConfigFile.data.post.entries[i].files[j].file.filename;
+          if (validUrl.isUri(videoFileUrl)) {
+            if (DEBUG) console.log(`[PARSE] is a valid URL.`);
+          } else {
+            if (DEBUG) console.log(`[PARSE] is not a valid URL.`);
+          }
           if (await isVideoUrl(videoFileUrl)) {
             isFile = true;
             newFile["file"] = videoFileUrl;

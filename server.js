@@ -116,8 +116,6 @@ let vlcGetTime = async function () {
 async function vlcPlayer(file, loop = false, volume = Volume, audio = false, fullscreen = false) {
   var fileName = file;
 
-  //TODO check if file or url
-
   State.isPlaying = true;
   State.file = file;
   State.fileId = Parser.getIdByFile(file);
@@ -171,17 +169,18 @@ async function vlcPlayer(file, loop = false, volume = Volume, audio = false, ful
 async function vlcBlockPlaying() {
   return new Promise(async (resolve, reject) => {
     if (vlcPlayerTask != undefined) {
+      if (DEBUG) console.log("[VLC] block - wait until vlc is finished ...");
       const checkIntervall = setInterval(async () => {
         if (vlcPlayerTask) {
-          if (DEBUG) console.log("[VLC] block - The process is still running.");
+          //if (DEBUG) console.log("[VLC] block - The process is still running.");
         } else {
           if (DEBUG) console.log("[VLC] block - The process has exited.");
           clearInterval(checkIntervall);
           setTimeout(() => {
             resolve(true);
-          }, 200);
+          }, 100);
         }
-      }, 1000);
+      }, 100);
     } else {
       resolve(true);
     }
@@ -296,6 +295,12 @@ Parser.init({ configpath: "./media/", configfile: "data_files.json" }, DEBUG).th
   });
   Parser.parseConfig().then(async (Config) => {
     //console.log("By ID XX " + Parser.getFileById(23));
+    if (Config.files.length <= 0 && Config.trigger.length <= 0) {
+      console.log("[MAIN] no files to play, restart ... ");
+      await vlcKill();
+      process.kill(process.pid, "SIGUSR2");
+      process.exit();
+    }
     BalenaRelease = await getBalenaRelease();
     if (BalenaRelease != false) {
       if (DEBUG) console.log(BalenaRelease);
@@ -303,7 +308,6 @@ Parser.init({ configpath: "./media/", configfile: "data_files.json" }, DEBUG).th
     } else {
       console.log("[MAIN] start local, no balena");
     }
-    MainFunction();
     if (!ISINTEL) {
       for (var i = 0; i < Config.trigger.length; i++) {
         if (Config.trigger[i].gpio != undefined) {
@@ -312,8 +316,8 @@ Parser.init({ configpath: "./media/", configfile: "data_files.json" }, DEBUG).th
         }
       }
     }
-
     console.log("[MAIN] --- INIT DONE ---");
+    MainFunction();
   });
 });
 
