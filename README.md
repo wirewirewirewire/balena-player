@@ -1,4 +1,10 @@
-## Omx Media Player with Strapi Config
+## vlc player with balena for amd64 und arm
+
+<img alt="Image of the balena-vlc Player" src="https://user-images.githubusercontent.com/3281586/261872653-1551361f-9b94-4c66-a3a2-7252f0688e7c.png" width="600"/>
+
+TODO: Add usage
+
+TODO: Add Link to Balena Brick
 
 This is a simple skeleton Express server project that works on any of the [balena][balena-link] supported devices.
 
