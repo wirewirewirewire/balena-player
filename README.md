@@ -8,10 +8,40 @@ TODO: Add Link to Balena Brick
 
 This is a simple skeleton Express server project that works on any of the [balena][balena-link] supported devices.
 
-This project serves up `"Hello World!"` on port `:80` of your balena device.
+### Installation on a multicontainer setup
+
+If you want to use `balena-player` in a multi container setup please add [this service](https://github.com/wirewirewirewire/balena-player/blob/vlc/docker-compose.yml) to your docker-compose.
+
+```bash
+balena-player:
+    build: .
+    network_mode: host  # Only needed if UDP broadcast should be sent
+    ports:
+      - 6666:6666 # Only needed if UDP broadcast should be sent
+    volumes:
+      - "workdir:/usr/src/app/media" # drive to mount the media to play
+      - "xserver:/tmp/.X11-unix" # external xserver
+    privileged: true
+    devices:
+      - /dev/dri
+    group_add:
+      - video  # Needed for X-Server to get access
+    labels:
+      io.resin.features.dbus: "1"
+      io.resin.features.kernel-modules: "1"
+      io.resin.features.firmware: "1"
+      io.balena.features.supervisor-api: "1" # Allow access to env variables
+```
+
+An external [X-Server](https://github.com/wirewirewirewire/xserver) is also required. TODO: A full example can be found [here](#).
+
+TODO: Add UDP docu
 
 To get this project up and running, you will need to signup for a balena account [here][signup-page] and set up an application and device. You'll find full details in our [Getting Started tutorial][gettingstarted-link].
 
+Setup you docker-compose and add the following sample [docker-compose]([https://github.com/wirewirewirewire/balena-player/blob/vlc/docker-compose.yml).
+
+#### Push to 
 Once you have downloaded this project, you can `balena push` it using the [balenaCLI][balena-cli]. This command will package up and push the code to the balena builders, where it will be compiled and built and deployed to every device in the application fleet. When it completes, you'll have a node.js web server running on your device and see some logs on your [balenaCloud dashboard][balena-dashboard].
 
 To give your device a public URL, access the device page on the [balenaCloud dashboard][balena-dashboard], and choose the _Public Device URL_ toggle. Alternatively, you can point your browser to your device's IP address.
@@ -39,12 +69,13 @@ await this.OmxPlayFile(this.getFileById(43),600)
 this.RestartMain();
 ```
 
-### Example:
+### Example
 
+```jsx
 if(currentLanguage === "de") {
-changeLanguage("en");
-const file = playersettings.basepath() + \_config[button_order_select].file;
-
+    changeLanguage("en");
+    const file = playersettings.basepath() + \_config[button_order_select].file;
     play(files[currentlyPlaying.replace("de", "en")]);
-
-omxplay_loop(file);
+    omxplay_loop(file);
+}
+```
