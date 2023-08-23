@@ -16,6 +16,7 @@ var vlcPlayerTask;
 var udpTimer;
 
 var ISINTEL = Parser.checkENV("ISINTEL", true);
+var UDPENABLED = Parser.checkENV("UDPENABLED", false);
 var DEBUG = Parser.checkENV("DEBUG", false);
 var Volume = Parser.checkENV("VOLUME", 500);
 
@@ -136,13 +137,14 @@ async function vlcPlayer(file, loop = false, volume = Volume, audio = false, ful
 
   return new Promise(async (resolve, reject) => {
     console.log("[VLC] start file: " + fileName);
-    console.log('[UDP] stream will be: "' + Parser.getConfig().stationName + "%" + State.fileSlug + '%<playertime>%<unixtimestamp>"');
+    if (UDPENABLED) console.log('[UDP] stream will be: "' + Parser.getConfig().stationName + "%" + State.fileSlug + '%<playertime>%<unixtimestamp>"');
 
     if (DEBUG) console.log("[VLC]  params: " + playerParams);
-
-    udpTimer = setInterval(async () => {
-      sendPostion(Parser.getConfig().stationName, State.fileSlug);
-    }, 1000);
+    if (UDPENABLED) {
+      udpTimer = setInterval(async () => {
+        sendPostion(Parser.getConfig().stationName, State.fileSlug);
+      }, 1000);
+    }
     var vlcPlayer = spawn("cvlc", playerParams, { env: env });
 
     vlcPlayer.stdout.on("data", (data) => {
