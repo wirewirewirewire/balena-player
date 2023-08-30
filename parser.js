@@ -113,13 +113,13 @@ module.exports = {
               break;
             }
           }
-      } else if (filesArray.length == 1){
-        let videoFileUrl = getSafe(() => filesArray[0].file.url, null);
-        let videoFileName = getSafe(() => filesArray[0].file.filename, null);
-        isFile = true;
-        newFile["file"] = videoFileUrl;
-        console.log("[PARSE] add only file: " + videoFileName);
-      }
+        } else if (filesArray.length == 1) {
+          let videoFileUrl = getSafe(() => filesArray[0].file.url, null);
+          let videoFileName = getSafe(() => filesArray[0].file.filename, null);
+          isFile = true;
+          newFile["file"] = videoFileUrl;
+          console.log("[PARSE] add only file: " + videoFileName);
+        }
         if (isFile) Config.files.push(newFile);
       }
       for (var i = 0; i < triggerCount; i++) {
