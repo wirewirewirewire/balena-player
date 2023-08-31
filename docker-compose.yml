@@ -5,7 +5,7 @@ volumes:
 services:
   balena-player:
     build: .
-    network_mode: host
+    network_mode: host # host is only needed if you use the UDP broadcast feature
     ports:
       - 6666:6666
     volumes:
@@ -21,3 +21,9 @@ services:
       io.resin.features.kernel-modules: "1"
       io.resin.features.firmware: "1"
       io.balena.features.supervisor-api: "1"
+  xserver:
+    image: gh_smarthomeagentur/xserver-aarch64 # x-server image. it may need to match your architecture
+    restart: always
+    privileged: true
+    volumes:
+      - "xserver:/tmp/.X11-unix"
