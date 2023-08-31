@@ -21,7 +21,15 @@ var DEBUG = Parser.checkENV("DEBUG", false);
 var Volume = Parser.checkENV("VOLUME", 500);
 
 const Buttons = [];
-var State = {};
+var State = {
+  file: "",
+  fileId: "",
+  isPlaying: false,
+  fileSlug: "",
+  rotation: 0,
+  volume: Volume,
+  audio: false,
+};
 var BalenaRelease;
 var BlockButton = false;
 var StopMainFunction = false;
@@ -114,7 +122,7 @@ let vlcGetTime = async function () {
   });
 };
 
-async function vlcPlayer(file, loop = false, volume = Volume, audio = false, fullscreen = false) {
+async function vlcPlayer(file, loop = false, fullscreen = false) {
   var fileName = file;
 
   State.isPlaying = true;
@@ -126,8 +134,20 @@ async function vlcPlayer(file, loop = false, volume = Volume, audio = false, ful
   if (loop) {
     playerParams.push("--loop");
   }
-  if (!audio) {
+  if (!State.audio) {
     playerParams.push("--no-audio");
+  }
+  if (State.rotation != 0) {
+    let rotation = 0;
+    if (State.rotation > 359 || State.rotation < 0) {
+      rotation = 0;
+      playerParams.push("--video-filter", "--ignore-config");
+    } else {
+      rotation = State.rotation;
+      playerParams.push("--vout-filter=transform");
+      playerParams.push("--transform-type=" + rotation);
+      playerParams.push("--video-filter", "transform{true}");
+    }
   }
   //TODO check if we need to start fullsccreen or if performance is better without
   if (fullscreen) {
@@ -136,7 +156,7 @@ async function vlcPlayer(file, loop = false, volume = Volume, audio = false, ful
   playerParams.push(fileName);
 
   return new Promise(async (resolve, reject) => {
-    console.log("[VLC] start file: " + fileName);
+    console.log("[VLC] start file: " + fileName + " audio: " + State.audio + " rotate: " + State.rotation);
     if (UDPENABLED) console.log('[UDP] stream will be: "' + Parser.getConfig().stationName + "%" + State.fileSlug + '%<playertime>%<unixtimestamp>"');
 
     if (DEBUG) console.log("[VLC]  params: " + playerParams);
@@ -189,7 +209,13 @@ async function vlcBlockPlaying() {
   });
 }
 
-async function vlcPlayFile(file, volume = Volume) {
+async function vlcSettings(rotation = 0, volume = Volume, audio = false) {
+  State.rotation = rotation;
+  State.volume = volume;
+  State.audio = audio;
+}
+
+async function vlcPlayFile(file) {
   return new Promise(async (resolve, reject) => {
     await vlcKill();
     vlcPlayerTask = await vlcPlayer(file);
@@ -197,7 +223,7 @@ async function vlcPlayFile(file, volume = Volume) {
     resolve(true);
   });
 }
-async function vlcPlayFileLoop(file, volume = Volume) {
+async function vlcPlayFileLoop(file) {
   return new Promise(async (resolve, reject) => {
     while (true) {
       await vlcKill();
@@ -233,6 +259,7 @@ function MainFunction(mainFunction = Parser.getConfig().mainfunction) {
       vlcPlayFile,
       vlcPlayFileLoop,
       vlcKill,
+      vlcSettings,
       getFileById,
       getIdByFile,
       RestartMain,
@@ -269,6 +296,7 @@ function attachButton(Trigger /*number, file, isrepeat = false, isdefault = fals
           vlcPlayFile,
           vlcPlayFileLoop,
           vlcKill,
+          vlcSettings,
           getFileById,
           getIdByFile,
           RestartMain,

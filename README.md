@@ -4,6 +4,48 @@
 
 TODO: Add usage
 
+### Functions
+
+All functions can be used in the loop that gets parsed by the balena-player. You will find examples below. 
+
+> `await vlcPlayFile(<filePath>)`
+
+Play a file once and wait until the file has finished or the player got killed by another source
+
+> `await vlcPlayFileLoop(<filePath>)`
+
+Play a file in a loop. The main function will never continue form here until the player gets killed by an external source.
+
+> `vlcKill()`
+
+Exits the `vlcPlayFile()` or `vlcPlayFileLoop()`. If it is executed outside the main loop, the loop may continues after the player exits.
+
+> `vlcSettings(<rotation>, <volume>, <audio>)`
+
+**rotation**: any number between 0 and 359. Rotates the video output this degree. DEFAULT: 0
+
+**volume**: any number between 0 and 100. Sets the audio volume of the video. DEFAULT: 100
+
+**audio**: true or false. Sets if audio output is enabled. DEFAULT: false
+
+> `RestartMain()`
+
+Restarts the main function from the beginning (loop). If you dont place this at the end of the main function it will end after executing once.
+
+> `getFileById(<ID>)`
+
+returns a file path from a id that is shown in the config frontend
+
+TODO: how to make this more universal?
+
+> `getIdByFile(<filePath>)`
+
+returns a ID of a file path. Opposite of `getFileById()`.
+
+
+
+
+
 TODO: Add Link to Balena Brick
 
 This is a simple skeleton Express server project that works on any of the [balena][balena-link] supported devices.
