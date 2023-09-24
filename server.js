@@ -29,6 +29,7 @@ var State = {
   rotation: 0,
   volume: Volume,
   audio: false,
+  intelnuc: false,
 };
 var BalenaRelease;
 var BlockButton = false;
@@ -149,6 +150,9 @@ async function vlcPlayer(file, loop = false, fullscreen = false) {
       playerParams.push("--video-filter", "transform{true}");
     }
   }
+  if (State.intelnuc) {
+    playerParams.push("--aout", "alsa", "--alsa-audio-device=plughw:CARD=0,DEV=3");
+  }
   //TODO check if we need to start fullsccreen or if performance is better without
   if (fullscreen) {
     playerParams.push("-f");
@@ -209,10 +213,11 @@ async function vlcBlockPlaying() {
   });
 }
 
-async function vlcSettings(rotation = 0, volume = Volume, audio = false) {
+async function vlcSettings(rotation = 0, volume = Volume, audio = false, intelnuc = false) {
   State.rotation = rotation;
   State.volume = volume;
   State.audio = audio;
+  State.intelnuc = intelnuc;
 }
 
 async function vlcPlayFile(file) {
